@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.demo.communicationexample.core.design.ConnectionTheme
+import com.demo.communicationexample.presentation.bt.BluetoothScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
