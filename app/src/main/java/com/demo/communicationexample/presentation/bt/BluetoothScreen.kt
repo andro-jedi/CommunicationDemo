@@ -1,9 +1,12 @@
 package com.demo.communicationexample.presentation.bt
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,19 +29,22 @@ fun BluetoothScreen(
 
     BluetoothScreen(
         uiState = uiState,
-        connect = viewModel::connect,
+        connect = viewModel::connectToDevice,
         sendMessage = viewModel::sendMessage,
+        startScanning = viewModel::startScanning,
         onPermissionsGranted = viewModel::setPermissionGranted,
         modifier = modifier
     )
 }
 
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BluetoothScreen(
     uiState: BluetoothUiState,
-    connect: () -> Unit,
+    connect: (device: BluetoothDevice) -> Unit,
     sendMessage: (String) -> Unit,
+    startScanning: () -> Unit,
     onPermissionsGranted: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -46,6 +52,7 @@ private fun BluetoothScreen(
     val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         // Android 12 and above
         arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.BLUETOOTH_SCAN,
@@ -55,6 +62,7 @@ private fun BluetoothScreen(
     } else {
         // Pre-Android 12 (API level 31)
         arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN
         )
@@ -67,10 +75,11 @@ private fun BluetoothScreen(
         onPermissionsGranted(permissionsMap.values.all { it })
     }
 
-    // Automatically check for permissions
     LaunchedEffect(Unit) {
         if (!uiState.isPermissionGranted) {
             requestPermissionLauncher.launch(permissions)
+        } else {
+            startScanning()
         }
     }
 
@@ -90,12 +99,10 @@ private fun BluetoothScreen(
         },
         contentWindowInsets = WindowInsets.systemBars,
     ) { innerPadding ->
-        Row(
+        Column(
             modifier = modifier
                 .padding(innerPadding)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
             if (uiState.isPermissionGranted) {
                 if (uiState.isConnected) {
@@ -111,8 +118,21 @@ private fun BluetoothScreen(
                         label = { Text("Send Message") }
                     )
                 } else {
-                    Button(onClick = connect) {
-                        Text("Connect")
+                    Text("Nearby devices:")
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(uiState.discoveredDevices) { device ->
+                            Text(
+                                text = device.name ?: "Unknown device",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { connect(device) }
+                                    .padding(8.dp)
+                            )
+                        }
+                    }
+
+                    Button(onClick = { startScanning() }) {
+                        Text("Rescan")
                     }
                 }
             } else {
