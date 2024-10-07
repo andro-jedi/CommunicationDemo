@@ -1,6 +1,6 @@
 package com.demo.communicationexample.data
 
-import android.bluetooth.BluetoothManager
+import com.demo.communicationexample.communication.BluetoothManager
 import com.demo.communicationexample.domain.entities.Message
 import kotlinx.coroutines.flow.Flow
 
