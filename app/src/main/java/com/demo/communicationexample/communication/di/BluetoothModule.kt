@@ -1,11 +1,14 @@
 package com.demo.communicationexample.communication.di
 
-import com.demo.communicationexample.communication.BluetoothManager
+import android.content.Context
+import com.demo.communicationexample.communication.BluetoothManagerWrapper
+import com.demo.communicationexample.communication.BluetoothManagerWrapperImpl
 import com.demo.communicationexample.data.BluetoothRepository
 import com.demo.communicationexample.data.BluetoothRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 
 @Module
@@ -13,10 +16,12 @@ import dagger.hilt.components.SingletonComponent
 object BluetoothModule {
 
     @Provides
-    fun provideBluetoothManager(): BluetoothManager = BluetoothManager()
+    fun provideBluetoothManager(@ApplicationContext context: Context): BluetoothManagerWrapper {
+        return BluetoothManagerWrapperImpl(context)
+    }
 
     @Provides
-    fun provideBluetoothRepository(bluetoothManager: BluetoothManager): BluetoothRepository {
+    fun provideBluetoothRepository(bluetoothManager: BluetoothManagerWrapper): BluetoothRepository {
         return BluetoothRepositoryImpl(bluetoothManager)
     }
 }
