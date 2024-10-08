@@ -9,8 +9,4 @@ interface BluetoothManagerWrapper {
     val bluetoothAdapter: BluetoothAdapter?
 
     fun isBluetoothEnabled(): Boolean
-    fun getConnectedDevices(profile: Int): List<BluetoothDevice>
-
-    fun stopDeviceScan(bluetoothReceiver: BroadcastReceiver)
-    suspend fun startDeviceScan(bluetoothReceiver: BroadcastReceiver)
 }
