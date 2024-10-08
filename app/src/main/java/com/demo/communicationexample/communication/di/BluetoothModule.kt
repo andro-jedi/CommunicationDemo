@@ -3,8 +3,8 @@ package com.demo.communicationexample.communication.di
 import android.content.Context
 import com.demo.communicationexample.communication.BluetoothManagerWrapper
 import com.demo.communicationexample.communication.BluetoothManagerWrapperImpl
-import com.demo.communicationexample.data.BluetoothRepository
-import com.demo.communicationexample.data.BluetoothRepositoryImpl
+import com.demo.communicationexample.data.AndroidBluetoothController
+import com.demo.communicationexample.domain.BluetoothController
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,7 +23,8 @@ object BluetoothModule {
     }
 
     @Provides
-    fun provideBluetoothRepository(bluetoothManager: BluetoothManagerWrapper): BluetoothRepository {
-        return BluetoothRepositoryImpl(bluetoothManager)
+    @Singleton
+    fun provideBluetoothController(@ApplicationContext context: Context): BluetoothController {
+        return AndroidBluetoothController(context)
     }
 }

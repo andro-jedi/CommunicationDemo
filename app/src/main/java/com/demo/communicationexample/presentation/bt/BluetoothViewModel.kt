@@ -1,70 +1,148 @@
 package com.demo.communicationexample.presentation.bt
 
-import android.bluetooth.BluetoothDevice
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.demo.communicationexample.data.BluetoothRepository
+import com.demo.communicationexample.domain.BluetoothController
+import com.demo.communicationexample.domain.ConnectionResult
+import com.demo.communicationexample.domain.entities.BluetoothDeviceDomain
 import com.demo.communicationexample.domain.entities.Message
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class BluetoothViewModel @Inject constructor(
-    private val bluetoothRepository: BluetoothRepository
+    private val bluetoothController: BluetoothController
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(BluetoothUiState())
+    private val _state = MutableStateFlow(BluetoothUiState())
+    val state = combine(
+        bluetoothController.scannedDevices,
+        bluetoothController.pairedDevices,
+        _state
+    ) { scannedDevices, pairedDevices, state ->
+        state.copy(
+            scannedDevices = scannedDevices.toList(),
+            pairedDevices = pairedDevices.toList()
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        _state.value
+    )
 
-    val uiState: StateFlow<BluetoothUiState> = combine(
-        bluetoothRepository.discoveredDevices,
-        _uiState
-    ) { discoveredDevices, uiState ->
-        uiState.copy(discoveredDevices = discoveredDevices.toList())
-    }.stateIn(viewModelScope, SharingStarted.Lazily, BluetoothUiState())
+    private var deviceConnectionJob: Job? = null
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            bluetoothRepository.receiveMessages().collect { message ->
-                _uiState.update { state ->
-                    state.copy(messages = state.messages + message)
+        bluetoothController.state.onEach { state ->
+            _state.update {
+                it.copy(
+                    isScanning = state.isScanning,
+                    errorMessage = state.errorMessage,
+                    isConnected = state.isConnected
+                )
+            }
+        }.launchIn(viewModelScope)
+    }
+
+    fun connectToDevice(device: BluetoothDeviceDomain) {
+        _state.update { it.copy(isConnecting = true) }
+        deviceConnectionJob = bluetoothController.connectToDevice(device).listenForResult()
+    }
+
+    fun disconnectFromDevice() {
+        deviceConnectionJob?.cancel()
+        bluetoothController.closeConnection()
+        _state.update {
+            it.copy(
+                isConnecting = false,
+                isConnected = false
+            )
+        }
+    }
+
+    fun waitForIncomingConnections() {
+        _state.update { it.copy(isConnected = true) }
+        deviceConnectionJob = bluetoothController
+            .startBluetoothServer()
+            .listenForResult()
+    }
+
+    fun startScan() {
+        bluetoothController.startDiscovery()
+    }
+
+    fun stopScan() {
+        bluetoothController.stopDiscovery()
+    }
+
+    fun sendMessage(messages: String) {
+        viewModelScope.launch {
+            val bluetoothMessage = bluetoothController.sendMessage(messages)
+            if (bluetoothMessage != null) {
+                _state.update {
+                    it.copy(
+                        messages = it.messages + bluetoothMessage
+                    )
                 }
             }
         }
     }
 
-    fun startScanning() {
-        viewModelScope.launch {
-            bluetoothRepository.startDeviceScan()
-        }
-    }
+    /**
+     * listen is an extension function that listens to the Flow<ConnectionResult> and updates the state accordingly
+     */
+    private fun Flow<ConnectionResult>.listenForResult(): Job {
+        return onEach { result ->
+            when (result) {
+                ConnectionResult.Connected -> {
+                    _state.update {
+                        it.copy(
+                            isConnected = true,
+                            isConnecting = false,
+                            errorMessage = null
+                        )
+                    }
+                }
 
-    fun stopScanning() {
-        bluetoothRepository.stopDeviceScan()
-    }
+                is ConnectionResult.Error -> {
+                    _state.update {
+                        it.copy(
+                            isConnected = false,
+                            isConnecting = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
 
-    fun connectToDevice(device: BluetoothDevice) {
-        viewModelScope.launch {
-            val isConnected = bluetoothRepository.connectToDevice(device)
-            _uiState.update { it.copy(isConnected = isConnected) }
-        }
-    }
-
-    fun sendMessage(message: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val msg = Message(message, System.currentTimeMillis(), isSent = true)
-            bluetoothRepository.sendMessage(msg)
-            _uiState.update { state ->
-                state.copy(messages = state.messages + msg)
+                is ConnectionResult.Transferred -> {
+                    Log.d("BluetoothViewModel", "Transferred message: ${result.message}")
+                    val message = Message(content = result.message, isSent = false, timestamp = System.currentTimeMillis())
+                    _state.update {
+                        it.copy(messages = it.messages + message)
+                    }
+                }
             }
         }
+            .catch { throwable ->
+                Log.e("BluetoothViewModel", "Error: ${throwable.message}")
+                bluetoothController.closeConnection()
+                _state.update {
+                    it.copy(
+                        isConnected = false,
+                        isConnecting = false,
+                    )
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
-    fun setPermissionGranted(granted: Boolean) {
-        _uiState.update { state ->
-            state.copy(isPermissionGranted = granted)
-        }
+    override fun onCleared() {
+        super.onCleared()
+        disconnectFromDevice()
+        bluetoothController.release()
     }
 }
