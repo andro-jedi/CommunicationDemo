@@ -11,7 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import com.demo.communicationexample.communication.BluetoothManagerWrapper
 import com.demo.communicationexample.core.design.ConnectionTheme
-import com.demo.communicationexample.presentation.bt.BluetoothApp
+import com.demo.communicationexample.presentation.bt.BluetoothScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ConnectionTheme {
-                BluetoothApp()
+                BluetoothScreen()
             }
         }
     }
